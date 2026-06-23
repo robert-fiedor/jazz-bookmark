@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#080b10">
+    <title>YouTube Audiobook Controller</title>
+    <link rel="stylesheet" href="styles.css?v=20260623-bookmark-order">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <h1>YouTube Audiobook Controller</h1>
+        <p id="current-video-title" class="video-title">No video loaded</p>
+      </header>
+
+      <section class="panel video-loader" aria-labelledby="video-loader-title">
+        <h2 id="video-loader-title">Load a YouTube video</h2>
+        <label for="video-input">YouTube URL or Video ID</label>
+        <div class="load-row">
+          <input id="video-input" type="text" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+          <button id="load-video" type="button">Load Video</button>
+        </div>
+        <p id="status-message" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel history-panel" aria-label="History">
+        <div class="tabs" role="tablist" aria-label="History">
+          <button id="last-played-tab" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="last-played-panel">Last Played</button>
+          <button id="history-tab" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="history-panel">History</button>
+        </div>
+        <div id="last-played-panel" class="tab-panel active" role="tabpanel" aria-labelledby="last-played-tab">
+          <ul id="last-played-list" class="video-list" aria-label="Last Played"></ul>
+        </div>
+        <div id="history-panel" class="tab-panel" role="tabpanel" aria-labelledby="history-tab" hidden>
+          <ul id="history-list" class="video-list" aria-label="History"></ul>
+        </div>
+      </section>
+
+      <section class="panel controls-panel" aria-labelledby="controls-title">
+        <h2 id="controls-title">Controls</h2>
+        <div class="skip-grid" aria-label="Playback controls">
+          <button id="forward-30" type="button">Forward 30 seconds</button>
+          <button id="forward-10" type="button">Forward 10 seconds</button>
+          <button id="play-pause" class="primary-action" type="button">Play/Pause</button>
+          <button id="back-10" type="button">Back 10 seconds</button>
+          <button id="back-30" type="button">Back 30 seconds</button>
+        </div>
+        <p class="time-readout">Current Time: <span id="current-time">00:00</span></p>
+      </section>
+
+      <section class="panel bookmarks-panel" aria-labelledby="bookmarks-title">
+        <div class="bookmark-header">
+          <h2 id="bookmarks-title">Bookmarks</h2>
+          <button id="add-bookmark" type="button">Add Bookmark</button>
+        </div>
+        <ul id="bookmark-list" class="bookmark-list" aria-label="Bookmarks"></ul>
+      </section>
+
+      <section class="player-section" aria-label="YouTube Player">
+        <div class="youtube-frame">
+          <div id="player-container"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js?v=20260623-bookmark-order"></script>
+  </body>
+</html>

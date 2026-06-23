@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+GITLEAKS="/Users/robertfiedor/.codex/tools/gitleaks/current/bin/gitleaks"
+
+if [ ! -x "$GITLEAKS" ]; then
+  echo "gitleaks not found at $GITLEAKS" >&2
+  exit 1
+fi
+
+"$GITLEAKS" protect --staged --redact --verbose
