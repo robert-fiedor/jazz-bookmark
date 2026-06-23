@@ -2,10 +2,10 @@
   "use strict";
 
   const STORAGE_KEYS = {
-    lastVideoId: "ytab:lastVideoId",
-    bookmarks: "ytab:bookmarks",
-    positions: "ytab:lastPositionByVideo",
-    history: "ytab:videoHistory"
+    lastVideoId: "jazz-bookmark:lastVideoId",
+    bookmarks: "jazz-bookmark:bookmarks",
+    positions: "jazz-bookmark:lastPositionByVideo",
+    history: "jazz-bookmark:videoHistory"
   };
   let player = null;
   let playerReady = false;
@@ -783,7 +783,7 @@
 
   function checkStorage() {
     try {
-      const testKey = "ytab:storage-test";
+      const testKey = "jazz-bookmark:storage-test";
       window.localStorage.setItem(testKey, "1");
       window.localStorage.removeItem(testKey);
       return true;
