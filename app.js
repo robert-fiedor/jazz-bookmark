@@ -7,8 +7,6 @@
     positions: "ytab:lastPositionByVideo",
     history: "ytab:videoHistory"
   };
-  const MAX_BOOKMARKS = 3;
-
   let player = null;
   let playerReady = false;
   let currentVideoId = null;
@@ -185,13 +183,13 @@
       } else if (url.searchParams.has("v")) {
         info.videoId = cleanVideoId(url.searchParams.get("v"));
       } else {
-        const embedMatch = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
-        if (embedMatch) {
-          info.videoId = embedMatch[1];
+        const pathMatch = url.pathname.match(/\/(?:embed|shorts|live|v)\/([a-zA-Z0-9_-]{11})/);
+        if (pathMatch) {
+          info.videoId = pathMatch[1];
         }
       }
 
-      info.startSeconds = parseTimeParam(url.searchParams.get("t") || url.searchParams.get("start"));
+      info.startSeconds = getUrlStartSeconds(url);
     } catch (error) {
       info.videoId = null;
     }
@@ -199,22 +197,38 @@
     return info;
   }
 
-  function extractVideoId(input) {
-    return extractVideoInfo(input).videoId;
-  }
-
   function cleanVideoId(value) {
     const match = String(value || "").match(/[a-zA-Z0-9_-]{11}/);
     return match ? match[0] : null;
   }
 
+  function getUrlStartSeconds(url) {
+    const rawTime = url.searchParams.get("t")
+      || url.searchParams.get("start")
+      || url.searchParams.get("time_continue")
+      || url.searchParams.get("time")
+      || url.hash.replace(/^#/, "");
+
+    return parseTimeParam(rawTime);
+  }
+
   function parseTimeParam(value) {
-    const raw = String(value || "").trim();
+    let raw = String(value || "").trim().toLowerCase();
     if (!raw) {
       return 0;
     }
+    raw = raw.replace(/^t=/, "").replace(/^start=/, "");
     if (/^\d+$/.test(raw)) {
       return Number(raw);
+    }
+
+    const colonParts = raw.split(":");
+    if (colonParts.length > 1 && colonParts.every(function (part) {
+      return /^\d+$/.test(part);
+    })) {
+      return colonParts.reduce(function (total, part) {
+        return (total * 60) + Number(part);
+      }, 0);
     }
 
     const match = raw.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
@@ -306,7 +320,6 @@
     };
 
     bookmarks.push(bookmark);
-    bookmarks = getMostRecentBookmarks(bookmarks, MAX_BOOKMARKS);
     saveBookmarks();
     renderBookmarks();
     showStatus("");
@@ -350,21 +363,14 @@
 
   function loadBookmarks() {
     const saved = getStoredJson(STORAGE_KEYS.bookmarks, []);
-    const storedBookmarks = Array.isArray(saved) ? saved : [];
-    const recentBookmarks = getMostRecentBookmarks(storedBookmarks, MAX_BOOKMARKS);
-    if (recentBookmarks.length !== storedBookmarks.length) {
-      setStoredJson(STORAGE_KEYS.bookmarks, recentBookmarks);
+    if (!Array.isArray(saved)) {
+      return [];
     }
-    return recentBookmarks;
-  }
-
-  function getMostRecentBookmarks(items, limit) {
-    return items
+    return saved
       .slice()
       .sort(function (a, b) {
         return getBookmarkCreatedAtMs(b) - getBookmarkCreatedAtMs(a);
-      })
-      .slice(0, limit);
+      });
   }
 
   function getBookmarkCreatedAtMs(bookmark) {
