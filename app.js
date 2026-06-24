@@ -543,22 +543,41 @@
   }
 
   function loadPlayerVideoAt(videoId, startSeconds, shouldPlay) {
-    player.loadVideoById(videoId, startSeconds);
-    loadedVideoId = videoId;
+    const safeStart = Math.max(0, Math.floor(Number(startSeconds) || 0));
+    const playbackRequest = {
+      videoId: videoId,
+      startSeconds: safeStart
+    };
 
-    window.setTimeout(function () {
-      if (currentVideoId === videoId && canUsePlayerMethod("seekTo")) {
-        player.seekTo(startSeconds, true);
-      }
-      if (currentVideoId === videoId && shouldPlay && canUsePlayerMethod("playVideo")) {
-        player.playVideo();
-        postPlayerCommand("playVideo");
-      }
-      if (currentVideoId === videoId && !shouldPlay && canUsePlayerMethod("pauseVideo")) {
-        player.pauseVideo();
-        postPlayerCommand("pauseVideo");
-      }
-    }, 500);
+    try {
+      player.loadVideoById(playbackRequest);
+    } catch (error) {
+      player.loadVideoById(videoId, safeStart);
+    }
+    loadedVideoId = videoId;
+    reinforcePlayerStart(videoId, safeStart, shouldPlay);
+  }
+
+  function reinforcePlayerStart(videoId, startSeconds, shouldPlay) {
+    [250, 900, 1800].forEach(function (delay) {
+      window.setTimeout(function () {
+        if (currentVideoId !== videoId) {
+          return;
+        }
+        if (canUsePlayerMethod("seekTo")) {
+          player.seekTo(startSeconds, true);
+          postPlayerCommand("seekTo", [startSeconds, true]);
+        }
+        if (shouldPlay && canUsePlayerMethod("playVideo")) {
+          player.playVideo();
+          postPlayerCommand("playVideo");
+        }
+        if (!shouldPlay && canUsePlayerMethod("pauseVideo")) {
+          player.pauseVideo();
+          postPlayerCommand("pauseVideo");
+        }
+      }, delay);
+    });
   }
 
   function saveCurrentVideo() {
