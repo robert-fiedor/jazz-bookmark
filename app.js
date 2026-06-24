@@ -684,9 +684,55 @@
       time.textContent = formatTime(video.lastPosition || 0);
 
       button.append(title, time);
-      item.appendChild(button);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "danger video-delete";
+      deleteButton.textContent = "Delete";
+      deleteButton.addEventListener("click", function () {
+        deleteVideoFromHistory(video.videoId);
+      });
+
+      item.append(button, deleteButton);
       listElement.appendChild(item);
     });
+  }
+
+  function deleteVideoFromHistory(videoId) {
+    videoHistory = videoHistory.filter(function (item) {
+      return item.videoId !== videoId;
+    });
+    delete positionsByVideo[videoId];
+    bookmarks = bookmarks.filter(function (bookmark) {
+      return bookmark.videoId !== videoId;
+    });
+
+    saveVideoHistory();
+    setStoredJson(STORAGE_KEYS.positions, positionsByVideo);
+    saveBookmarks();
+
+    if (currentVideoId === videoId) {
+      currentVideoId = null;
+      loadedVideoId = null;
+      pendingVideoId = null;
+      pendingSeekSeconds = null;
+      pendingShouldPlay = false;
+      removeStoredValue(STORAGE_KEYS.lastVideoId);
+      elements.videoInput.value = "";
+      elements.currentTime.textContent = "00:00";
+      if (canUsePlayerMethod("stopVideo")) {
+        player.stopVideo();
+        postPlayerCommand("stopVideo");
+      }
+      if (canUsePlayerMethod("clearVideo")) {
+        player.clearVideo();
+      }
+    }
+
+    renderBookmarks();
+    renderVideoHistory();
+    updateVideoTitle();
+    showStatus("");
   }
 
   function setActiveTab(tabName) {
@@ -809,6 +855,18 @@
     }
     try {
       window.localStorage.setItem(key, value);
+    } catch (error) {
+      storageAvailable = false;
+      showStatus("Bookmarks may not persist in this browser.");
+    }
+  }
+
+  function removeStoredValue(key) {
+    if (!storageAvailable) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(key);
     } catch (error) {
       storageAvailable = false;
       showStatus("Bookmarks may not persist in this browser.");
