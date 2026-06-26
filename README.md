@@ -1,4 +1,4 @@
-# YouTube Audiobook Controller
+# Jazz Book
 
 One-page, mobile-first web app for iPhone that embeds a visible YouTube player and provides audiobook-style controls above it.
 
