@@ -73,6 +73,9 @@
     elements.currentTime = document.getElementById("current-time");
     elements.status = document.getElementById("status-message");
     elements.currentVideoTitle = document.getElementById("current-video-title");
+    elements.copyState = document.getElementById("copy-state");
+    elements.shareState = document.getElementById("share-state");
+    elements.pasteState = document.getElementById("paste-state");
   }
 
   function bindEvents() {
@@ -102,6 +105,9 @@
     elements.historyTab.addEventListener("click", function () {
       setActiveTab("history");
     });
+    elements.copyState.addEventListener("click", copyStateToClipboard);
+    elements.shareState.addEventListener("click", shareState);
+    elements.pasteState.addEventListener("click", pasteStateFromClipboard);
   }
 
   function loadYouTubeApi() {
@@ -629,7 +635,6 @@
     videoHistory.sort(function (a, b) {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-    videoHistory = videoHistory.slice(0, 50);
     saveVideoHistory();
     renderVideoHistory();
   }
@@ -827,6 +832,263 @@
       return savedTime;
     }
     return currentTime;
+  }
+
+  function buildStatePackage() {
+    return {
+      app: "Jazz Book",
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      state: {
+        lastVideoId: currentVideoId || getStoredValue(STORAGE_KEYS.lastVideoId) || null,
+        bookmarks: bookmarks.slice(),
+        positionsByVideo: Object.assign({}, positionsByVideo),
+        videoHistory: videoHistory.slice()
+      }
+    };
+  }
+
+  async function copyStateToClipboard() {
+    const payload = JSON.stringify(buildStatePackage(), null, 2);
+    try {
+      await writeClipboardText(payload);
+      showStatus("State copied.");
+    } catch (error) {
+      window.prompt("Copy this Jazz Book state:", payload);
+      showStatus("Copy the state text from the prompt.");
+    }
+  }
+
+  async function shareState() {
+    const payload = JSON.stringify(buildStatePackage(), null, 2);
+    const shareData = {
+      title: "Jazz Book State",
+      text: payload
+    };
+
+    try {
+      if (window.File && navigator.canShare) {
+        const file = new File([payload], "jazz-book-state.json", {
+          type: "application/json"
+        });
+        const fileShareData = {
+          title: "Jazz Book State",
+          text: "Jazz Book state export",
+          files: [file]
+        };
+        if (navigator.canShare(fileShareData)) {
+          await navigator.share(fileShareData);
+          showStatus("State shared.");
+          return;
+        }
+      }
+
+      if (navigator.share) {
+        await navigator.share(shareData);
+        showStatus("State shared.");
+        return;
+      }
+
+      await writeClipboardText(payload);
+      showStatus("State copied.");
+    } catch (error) {
+      showStatus("Share canceled.");
+    }
+  }
+
+  async function pasteStateFromClipboard() {
+    let rawState = "";
+    try {
+      rawState = await readClipboardText();
+    } catch (error) {
+      rawState = window.prompt("Paste Jazz Book state here:") || "";
+    }
+
+    const importedState = parseImportedState(rawState);
+    if (!importedState) {
+      showStatus("Could not read Jazz Book state.");
+      return;
+    }
+
+    const result = mergeImportedState(importedState);
+    renderBookmarks();
+    renderVideoHistory();
+    updateVideoTitle();
+    showStatus("Merged " + result.videosAdded + " videos and " + result.bookmarksAdded + " bookmarks.");
+  }
+
+  async function writeClipboardText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    throw new Error("Clipboard write is unavailable.");
+  }
+
+  async function readClipboardText() {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      return navigator.clipboard.readText();
+    }
+    throw new Error("Clipboard read is unavailable.");
+  }
+
+  function parseImportedState(rawState) {
+    if (!rawState) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(String(rawState).trim());
+      const source = parsed && parsed.state ? parsed.state : parsed;
+      return normalizeImportedState(source);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function normalizeImportedState(source) {
+    if (!source || typeof source !== "object") {
+      return null;
+    }
+
+    const importedHistory = Array.isArray(source.videoHistory)
+      ? source.videoHistory.filter(isValidHistoryItem).map(normalizeHistoryItem)
+      : [];
+    const importedBookmarks = Array.isArray(source.bookmarks)
+      ? source.bookmarks.map(normalizeBookmark).filter(Boolean)
+      : [];
+    const importedPositions = normalizePositions(source.positionsByVideo || source.positions || {});
+    const importedLastVideoId = typeof source.lastVideoId === "string" && source.lastVideoId.length === 11
+      ? source.lastVideoId
+      : null;
+
+    if (!importedHistory.length && !importedBookmarks.length && !Object.keys(importedPositions).length && !importedLastVideoId) {
+      return null;
+    }
+
+    return {
+      lastVideoId: importedLastVideoId,
+      bookmarks: importedBookmarks,
+      positionsByVideo: importedPositions,
+      videoHistory: importedHistory
+    };
+  }
+
+  function normalizeHistoryItem(item) {
+    const now = new Date().toISOString();
+    return {
+      videoId: item.videoId,
+      title: item.title || item.videoId,
+      lastPosition: Math.max(0, Math.floor(Number(item.lastPosition) || 0)),
+      createdAt: isIsoDate(item.createdAt) ? item.createdAt : now,
+      updatedAt: isIsoDate(item.updatedAt) ? item.updatedAt : now
+    };
+  }
+
+  function normalizeBookmark(bookmark) {
+    if (!bookmark || typeof bookmark.videoId !== "string" || bookmark.videoId.length !== 11) {
+      return null;
+    }
+
+    const timeSeconds = Math.max(0, Math.floor(Number(bookmark.timeSeconds) || 0));
+    const createdAt = isIsoDate(bookmark.createdAt) ? bookmark.createdAt : new Date().toISOString();
+    return {
+      id: typeof bookmark.id === "string" && bookmark.id ? bookmark.id : "bookmark_" + Date.now(),
+      videoId: bookmark.videoId,
+      timeSeconds: timeSeconds,
+      label: bookmark.label || "Bookmark at " + formatTime(timeSeconds),
+      createdAt: createdAt
+    };
+  }
+
+  function normalizePositions(source) {
+    return Object.keys(source || {}).reduce(function (result, videoId) {
+      const seconds = Math.floor(Number(source[videoId]));
+      if (videoId.length === 11 && Number.isFinite(seconds) && seconds >= 0) {
+        result[videoId] = seconds;
+      }
+      return result;
+    }, {});
+  }
+
+  function isIsoDate(value) {
+    return typeof value === "string" && Number.isFinite(Date.parse(value));
+  }
+
+  function mergeImportedState(importedState) {
+    const existingHistoryIds = new Set(videoHistory.map(function (item) {
+      return item.videoId;
+    }));
+    const existingBookmarkSignatures = new Set(bookmarks.map(getBookmarkSignature));
+    const existingBookmarkIds = new Set(bookmarks.map(function (bookmark) {
+      return bookmark.id;
+    }));
+    let videosAdded = 0;
+    let bookmarksAdded = 0;
+
+    importedState.videoHistory.forEach(function (item) {
+      if (!existingHistoryIds.has(item.videoId)) {
+        videoHistory.push(item);
+        existingHistoryIds.add(item.videoId);
+        videosAdded += 1;
+      }
+    });
+
+    Object.keys(importedState.positionsByVideo).forEach(function (videoId) {
+      if (positionsByVideo[videoId] === undefined) {
+        positionsByVideo[videoId] = importedState.positionsByVideo[videoId];
+      }
+    });
+
+    importedState.bookmarks.forEach(function (bookmark) {
+      const signature = getBookmarkSignature(bookmark);
+      if (existingBookmarkSignatures.has(signature)) {
+        return;
+      }
+
+      const nextBookmark = Object.assign({}, bookmark);
+      if (existingBookmarkIds.has(nextBookmark.id)) {
+        nextBookmark.id = createImportedBookmarkId(existingBookmarkIds);
+      }
+      bookmarks.push(nextBookmark);
+      existingBookmarkSignatures.add(signature);
+      existingBookmarkIds.add(nextBookmark.id);
+      bookmarksAdded += 1;
+    });
+
+    if (!currentVideoId && importedState.lastVideoId) {
+      currentVideoId = importedState.lastVideoId;
+      setStoredValue(STORAGE_KEYS.lastVideoId, currentVideoId);
+      elements.videoInput.value = currentVideoId;
+    }
+
+    videoHistory.sort(function (a, b) {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+    bookmarks.sort(function (a, b) {
+      return getBookmarkCreatedAtMs(b) - getBookmarkCreatedAtMs(a);
+    });
+
+    saveVideoHistory();
+    setStoredJson(STORAGE_KEYS.positions, positionsByVideo);
+    saveBookmarks();
+
+    return {
+      videosAdded: videosAdded,
+      bookmarksAdded: bookmarksAdded
+    };
+  }
+
+  function getBookmarkSignature(bookmark) {
+    return [bookmark.videoId, Math.floor(Number(bookmark.timeSeconds) || 0), bookmark.label || ""].join("|");
+  }
+
+  function createImportedBookmarkId(existingIds) {
+    let id = "bookmark_imported_" + Date.now();
+    while (existingIds.has(id)) {
+      id = "bookmark_imported_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
+    }
+    return id;
   }
 
   function postPlayerCommand(func, args) {

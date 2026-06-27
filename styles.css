@@ -84,6 +84,25 @@ button.danger {
   padding: 8px 2px 14px;
 }
 
+.title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.state-actions {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  gap: 6px;
+}
+
+.state-actions button {
+  min-height: 34px;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.8rem;
+}
+
 h1,
 h2,
 p {

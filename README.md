@@ -16,6 +16,7 @@ One-page, mobile-first web app for iPhone that embeds a visible YouTube player a
 - Show the current playback time.
 - Add, jump to, and delete bookmarks.
 - Persist the last video, bookmarks, and last playback position in `localStorage`.
+- Copy, share, and paste app state between devices without deleting existing local data.
 
 ## GitHub Pages
 

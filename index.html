@@ -5,12 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#f6f8fb">
     <title>Jazz Book</title>
-    <link rel="stylesheet" href="styles.css?v=20260623-history-delete">
+    <link rel="stylesheet" href="styles.css?v=20260627-state-transfer">
   </head>
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <h1>Jazz Book</h1>
+        <div class="title-row">
+          <h1>Jazz Book</h1>
+          <div class="state-actions" aria-label="State transfer">
+            <button id="copy-state" type="button">Copy</button>
+            <button id="share-state" type="button">Share</button>
+            <button id="paste-state" type="button">Paste</button>
+          </div>
+        </div>
         <p id="current-video-title" class="video-title">No video loaded</p>
       </header>
 
@@ -64,6 +71,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260623-timestamp-load"></script>
+    <script src="app.js?v=20260627-state-transfer"></script>
   </body>
 </html>
