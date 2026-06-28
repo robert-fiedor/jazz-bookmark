@@ -7,6 +7,7 @@
     positions: "jazz-bookmark:lastPositionByVideo",
     history: "jazz-bookmark:videoHistory"
   };
+  const SHORT_VERTICAL_THRESHOLD_SECONDS = 110;
   let player = null;
   let playerReady = false;
   let currentVideoId = null;
@@ -138,6 +139,7 @@
     }
     updatePlayPauseLabel(event.data);
     applyPendingPlayback();
+    updateShortDurationLayout();
   }
 
   function loadVideoFromInput() {
@@ -482,6 +484,7 @@
     }
     elements.currentTime.textContent = formatTime(getReliableCurrentTime());
     syncCurrentVideoTitleFromPlayer();
+    updateShortDurationLayout();
   }
 
   function saveLastPosition() {
@@ -671,6 +674,20 @@
   function updatePlayerLayout(videoId, layoutHint) {
     const layout = layoutHint || (videoId ? getStoredVideoLayout(videoId) : "horizontal");
     elements.youtubeFrame.classList.toggle("vertical", layout === "vertical");
+  }
+
+  function updateShortDurationLayout() {
+    if (!currentVideoId || getStoredVideoLayout(currentVideoId) === "vertical" || !canUsePlayerMethod("getDuration")) {
+      return;
+    }
+
+    const duration = Number(player.getDuration() || 0);
+    if (!Number.isFinite(duration) || duration <= 0 || duration >= SHORT_VERTICAL_THRESHOLD_SECONDS) {
+      return;
+    }
+
+    upsertVideoHistory(currentVideoId, getCurrentDisplayTitle(), getCurrentPositionForHistory(), "vertical");
+    updatePlayerLayout(currentVideoId, "vertical");
   }
 
   function getCurrentDisplayTitle() {
