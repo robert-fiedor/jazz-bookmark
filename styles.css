@@ -341,6 +341,10 @@ input {
   background: #dce5ef;
 }
 
+.youtube-frame.vertical {
+  aspect-ratio: 9 / 16;
+}
+
 #player-container,
 #player-container iframe {
   display: block;

@@ -44,6 +44,7 @@
     renderBookmarks();
     renderVideoHistory();
     updateVideoTitle();
+    updatePlayerLayout(currentVideoId);
     loadYouTubeApi();
 
     if (!storageAvailable) {
@@ -73,6 +74,7 @@
     elements.currentTime = document.getElementById("current-time");
     elements.status = document.getElementById("status-message");
     elements.currentVideoTitle = document.getElementById("current-video-title");
+    elements.youtubeFrame = document.querySelector(".youtube-frame");
     elements.copyState = document.getElementById("copy-state");
     elements.shareState = document.getElementById("share-state");
     elements.pasteState = document.getElementById("paste-state");
@@ -144,10 +146,10 @@
       showStatus("Could not find a YouTube video ID. Paste a YouTube URL or video ID.");
       return;
     }
-    loadVideo(videoInfo.videoId, videoInfo.startSeconds, true);
+    loadVideo(videoInfo.videoId, videoInfo.startSeconds, true, videoInfo.layout);
   }
 
-  function loadVideo(videoId, startSeconds, shouldPlay) {
+  function loadVideo(videoId, startSeconds, shouldPlay, layoutHint) {
     const safeStart = Math.max(0, Math.floor(Number(startSeconds) || 0));
     currentVideoId = videoId;
     pendingVideoId = videoId;
@@ -157,7 +159,8 @@
     elements.currentTime.textContent = formatTime(safeStart);
     positionsByVideo[videoId] = safeStart;
     setStoredJson(STORAGE_KEYS.positions, positionsByVideo);
-    upsertVideoHistory(videoId, getStoredVideoTitle(videoId), safeStart);
+    upsertVideoHistory(videoId, getStoredVideoTitle(videoId), safeStart, layoutHint);
+    updatePlayerLayout(videoId, layoutHint);
     renderBookmarks();
     renderVideoHistory();
     updateVideoTitle();
@@ -174,7 +177,8 @@
     const value = String(input || "").trim();
     const info = {
       videoId: null,
-      startSeconds: 0
+      startSeconds: 0,
+      layout: null
     };
 
     if (/^[a-zA-Z0-9_-]{11}$/.test(value)) {
@@ -195,6 +199,9 @@
         }
       }
 
+      if (isShortsUrl(url)) {
+        info.layout = "vertical";
+      }
       info.startSeconds = getUrlStartSeconds(url);
     } catch (error) {
       info.videoId = null;
@@ -206,6 +213,10 @@
   function cleanVideoId(value) {
     const match = String(value || "").match(/[a-zA-Z0-9_-]{11}/);
     return match ? match[0] : null;
+  }
+
+  function isShortsUrl(url) {
+    return /\/shorts\/[a-zA-Z0-9_-]{11}/.test(url.pathname);
   }
 
   function getUrlStartSeconds(url) {
@@ -606,7 +617,7 @@
     return item && typeof item.videoId === "string" && item.videoId.length === 11;
   }
 
-  function upsertVideoHistory(videoId, title, lastPosition) {
+  function upsertVideoHistory(videoId, title, lastPosition, layoutHint) {
     if (!videoId) {
       return;
     }
@@ -622,13 +633,17 @@
       existing.title = nextTitle || existing.title || videoId;
       existing.lastPosition = nextPosition;
       existing.updatedAt = now;
+      if (layoutHint) {
+        existing.layout = layoutHint;
+      }
     } else {
       videoHistory.push({
         videoId: videoId,
         title: nextTitle || videoId,
         lastPosition: nextPosition,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        layout: layoutHint || "horizontal"
       });
     }
 
@@ -644,6 +659,18 @@
       return historyItem.videoId === videoId;
     });
     return item ? item.title : videoId;
+  }
+
+  function getStoredVideoLayout(videoId) {
+    const item = videoHistory.find(function (historyItem) {
+      return historyItem.videoId === videoId;
+    });
+    return item && item.layout === "vertical" ? "vertical" : "horizontal";
+  }
+
+  function updatePlayerLayout(videoId, layoutHint) {
+    const layout = layoutHint || (videoId ? getStoredVideoLayout(videoId) : "horizontal");
+    elements.youtubeFrame.classList.toggle("vertical", layout === "vertical");
   }
 
   function getCurrentDisplayTitle() {
@@ -695,7 +722,7 @@
       button.type = "button";
       button.className = "video-history-button";
       button.addEventListener("click", function () {
-        loadVideo(video.videoId, video.lastPosition || 0, false);
+        loadVideo(video.videoId, video.lastPosition || 0, false, video.layout);
         setActiveTab("last");
       });
 
@@ -751,6 +778,7 @@
       if (canUsePlayerMethod("clearVideo")) {
         player.clearVideo();
       }
+      updatePlayerLayout(null);
     }
 
     renderBookmarks();
@@ -981,7 +1009,8 @@
       title: item.title || item.videoId,
       lastPosition: Math.max(0, Math.floor(Number(item.lastPosition) || 0)),
       createdAt: isIsoDate(item.createdAt) ? item.createdAt : now,
-      updatedAt: isIsoDate(item.updatedAt) ? item.updatedAt : now
+      updatedAt: isIsoDate(item.updatedAt) ? item.updatedAt : now,
+      layout: item.layout === "vertical" ? "vertical" : "horizontal"
     };
   }
 
@@ -1060,6 +1089,7 @@
       currentVideoId = importedState.lastVideoId;
       setStoredValue(STORAGE_KEYS.lastVideoId, currentVideoId);
       elements.videoInput.value = currentVideoId;
+      updatePlayerLayout(currentVideoId);
     }
 
     videoHistory.sort(function (a, b) {
